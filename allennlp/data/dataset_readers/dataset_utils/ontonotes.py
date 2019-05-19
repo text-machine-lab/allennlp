@@ -54,6 +54,7 @@ class OntonotesSentence:
     """
     def __init__(self,
                  document_id: str,
+                 part_number: str,
                  sentence_id: int,
                  words: List[str],
                  pos_tags: List[str],
@@ -67,6 +68,7 @@ class OntonotesSentence:
                  coref_spans: Set[TypedSpan]) -> None:
 
         self.document_id = document_id
+        self.part_number = part_number
         self.sentence_id = sentence_id
         self.words = words
         self.pos_tags = pos_tags
@@ -207,14 +209,23 @@ class Ontonotes:
         with codecs.open(file_path, 'r', encoding='utf8') as open_file:
             conll_rows = []
             document: List[OntonotesSentence] = []
+            current_document_id = ''
+            current_part_number = ''
             for line in open_file:
                 line = line.strip()
+
+                if line.startswith('#begin document'):
+                    # The format is "#begin document (wb/c2e/00/c2e_0019); part 002"
+                    document_id_parts = line.replace('#begin document', '').split(';')
+                    current_document_id = document_id_parts[0].replace('(', '').replace(')', '').strip()
+                    current_part_number = document_id_parts[1].replace('part', '').strip()
+
                 if line != '' and not line.startswith('#'):
                     # Non-empty line. Collect the annotation.
                     conll_rows.append(line)
                 else:
                     if conll_rows:
-                        document.append(self._conll_rows_to_sentence(conll_rows))
+                        document.append(self._conll_rows_to_sentence(current_document_id, current_part_number, conll_rows))
                         conll_rows = []
                 if line.startswith("#end document"):
                     yield document
@@ -232,7 +243,7 @@ class Ontonotes:
             for sentence in document:
                 yield sentence
 
-    def _conll_rows_to_sentence(self, conll_rows: List[str]) -> OntonotesSentence:
+    def _conll_rows_to_sentence(self, document_id:str, part_number:str, conll_rows: List[str]) -> OntonotesSentence:
         document_id: str = None
         sentence_id: int = None
         # The words in the sentence.
@@ -346,6 +357,7 @@ class Ontonotes:
                                              for cluster_id, span_list in clusters.items()
                                              for span in span_list}
         return OntonotesSentence(document_id,
+                                 part_number,
                                  sentence_id,
                                  sentence,
                                  pos_tags,

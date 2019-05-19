@@ -71,6 +71,7 @@ class ConllCorefReader(DatasetReader):
         This is used to index the words in the document.  See :class:`TokenIndexer`.
         Default is ``{"tokens": SingleIdTokenIndexer()}``.
     """
+
     def __init__(self,
                  max_span_width: int,
                  token_indexers: Dict[str, TokenIndexer] = None,
@@ -87,6 +88,7 @@ class ConllCorefReader(DatasetReader):
         ontonotes_reader = Ontonotes()
         for sentences in ontonotes_reader.dataset_document_iterator(file_path):
             document_id = sentences[0].document_id
+            part_number = sentences[0].part_number
             clusters: DefaultDict[int, List[Tuple[int, int]]] = collections.defaultdict(list)
 
             total_tokens = 0
@@ -101,11 +103,12 @@ class ConllCorefReader(DatasetReader):
                 total_tokens += len(sentence.words)
 
             canonical_clusters = canonicalize_clusters(clusters)
-            yield self.text_to_instance(document_id, [s.words for s in sentences], canonical_clusters)
+            yield self.text_to_instance(document_id, part_number, [s.words for s in sentences], canonical_clusters)
 
     @overrides
     def text_to_instance(self,  # type: ignore
                          document_id: str,
+                         part_number: str,
                          sentences: List[List[str]],
                          gold_clusters: Optional[List[List[Tuple[int, int]]]] = None) -> Instance:
         # pylint: disable=arguments-differ
@@ -139,7 +142,12 @@ class ConllCorefReader(DatasetReader):
                                for sentence in sentences
                                for word in sentence]
 
-        metadata: Dict[str, Any] = {"document_id": document_id, "original_text": flattened_sentences}
+        metadata: Dict[str, Any] = {
+            "document_id": document_id,
+            "part_number": part_number,
+            "original_text": flattened_sentences,
+        }
+
         if gold_clusters is not None:
             metadata["clusters"] = gold_clusters
 
